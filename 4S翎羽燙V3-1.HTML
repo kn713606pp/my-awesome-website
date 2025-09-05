@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4S 翎羽燙 互動式全螢幕簡報 (最終版)</title>
+    <style>
+        /* 基本樣式 */
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #000; color: #fff;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+        }
+
+        /* 簡報容器 */
+        #presentation-container {
+            position: relative; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* YouTube 播放器 (背景) */
+        #player-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; opacity: 0; transition: opacity 1s ease-in;
+        }
+        #player-container.visible { opacity: 1; }
+        #player { width: 100%; height: 100%; }
+
+        /* 封面頁 */
+        #cover-page {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
+            display: flex; justify-content: center; align-items: center; flex-direction: column;
+            cursor: pointer; background-color: #000; background-size: cover; background-position: center;
+            transition: opacity 1.5s ease-out;
+        }
+        #cover-page.hidden { opacity: 0; pointer-events: none; }
+        #cover-page::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        #cover-content { position: relative; text-align: center; padding: 20px; }
+        #cover-page h1 { font-size: 3.5em; margin-bottom: 20px; color: #fff; text-shadow: 2px 2px 8px rgba(0,0,0,0.7); }
+        #cover-page p { font-size: 1.5em; color: #ddd; margin-bottom: 40px; }
+        #start-button {
+            padding: 15px 35px; font-size: 1.8em; background-color: #4a90e2; color: white;
+            border: none; border-radius: 50px; cursor: pointer; transition: background-color 0.3s, transform 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        #start-button:hover { background-color: #1a3a7a; transform: scale(1.05); }
+
+        /* 簡報幻燈片 */
+        #slides-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+        }
+        .slide {
+            position: absolute; width: 100%; height: 100%; display: flex;
+            justify-content: center; align-items: center; padding: 5%; box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.65); opacity: 0; visibility: hidden;
+            transition: opacity 1.2s ease-in-out;
+        }
+        .slide.active { opacity: 1; visibility: visible; }
+        .slide-content { max-width: 900px; text-align: left; }
+        .slide h2 { font-size: 3em; color: #fff; margin-bottom: 25px; border-bottom: 3px solid #4a90e2; padding-bottom: 15px; }
+        /* 移除了 .timestamp 的樣式 */
+        .slide ul { list-style: none; padding: 0; }
+        .slide li { font-size: 1.8em; margin-bottom: 20px; line-height: 1.6; position: relative; padding-left: 40px; color: #eee; }
+        .slide li::before { content: '✓'; color: #4a90e2; font-weight: bold; position: absolute; left: 0; top: 5px; }
+        
+        /* 手動控制按鈕 */
+        .nav-arrow {
+            position: absolute; top: 50%; transform: translateY(-50%); width: 50px; height: 50px;
+            background-color: rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-size: 2em;
+            cursor: pointer; z-index: 20; transition: background-color 0.3s, opacity 0.5s;
+            opacity: 0; pointer-events: none;
+        }
+        #presentation-container:hover .nav-arrow.visible,
+        .nav-arrow.visible:hover { background-color: rgba(74, 144, 226, 0.8); }
+        .nav-arrow.visible { opacity: 0.7; pointer-events: auto; }
+        #prev-btn { left: 30px; }
+        #next-btn { right: 30px; }
+
+        /* 即時跳動計時器 */
+        #timer-display {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            z-index: 50;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 1.2em;
+            font-family: 'Courier New', Courier, monospace;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        #timer-display.visible {
+            opacity: 1;
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .nav-arrow { width: 40px; height: 40px; font-size: 1.5em; }
+            #prev-btn { left: 15px; }
+            #next-btn { right: 15px; }
+            #timer-display { font-size: 1em; bottom: 15px; right: 15px; }
+            #cover-page h1 { font-size: 2.2em; }
+            #start-button { font-size: 1.2em; padding: 12px 28px; }
+            .slide h2 { font-size: 2em; }
+            .slide li { font-size: 1.2em; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="presentation-container">
+    
+    <div id="player-container"><div id="player"></div></div>
+
+    <div id="cover-page">
+        <div id="cover-content">
+            <h1>4S 翎羽燙 業務教戰</h1>
+            <p>點擊開始，進入沉浸式學習體驗</p>
+            <button id="start-button">▶ 播放簡報</button>
+        </div>
+    </div>
+
+    <div id="slides-container">
+        <div class="slide" data-timestamp="0"> <div class="slide-content"><h2>市場痛點：想燙又怕受傷害</h2><ul><li>顧客普遍擔心燙髮會導致髮質變差。</li><li>傳統燙髮藥劑的刺鼻氣味令人卻步。</li><li>設計師本身也對傳統成分感到疑慮。</li></ul></div> </div>
+        <div class="slide" data-timestamp="31"> <div class="slide-content"><h2>趨勢轉變：健康燙髮成為剛需</h2><ul><li>全球趨勢：美麗、健康、安全，三者缺一不可。</li><li>消費者意識提升，更重視健康與成分安全。</li><li>「健康燙髮」已從口號轉變為市場的剛性需求。</li></ul></div> </div>
+        <div class="slide" data-timestamp="68"> <div class="slide-content"><h2>改變規則：4S 翎羽燙登場</h2><ul><li>全新體驗：不僅改變造型，更在過程中保護與修護。</li><li>市場切入點：滿足消費者對健康燙髮的需求。</li><li>目標：改變燙髮的遊戲規則。</li></ul></div> </div>
+        <div class="slide" data-timestamp="86"> <div class="slide-content"><h2>核心 1：純半胱胺還原系統</h2><ul><li>溫和安全：半胱胺為頭髮既有成分，刺激性極低。</li><li>氣味清淡：解決傳統藥劑刺鼻難聞的問題。</li><li>配方單純：無添加 TG、無需鹽酸(HCL)調整酸鹼。</li></ul></div> </div>
+        <div class="slide" data-timestamp="141"> <div class="slide-content"><h2>核心 2：天然雙效植萃</h2><ul><li>專利野棗萃取：提供髮絲抗氧化與抗老化能力。</li><li>酒釀萃取：富含胺基酸，穩定燙後結構。</li><li>黃金植萃咖啡因：強韌髮根，補充養分。</li></ul></div> </div>
+        <div class="slide" data-timestamp="201"> <div class="slide-content"><h2>核心 3：麥克爾加成反應</h2><ul><li>技術核心：在塑型時，額外建立穩固的連接點。</li><li>效果比喻：如同在頭髮內部打上「微型支架」或「鋼筋」。</li><li>成果：提升捲度持久性，同時強化髮絲的強度與彈性。</li></ul></div> </div>
+        <div class="slide" data-timestamp="266"> <div class="slide-content"><h2>溝通策略 1：建立健康新觀念</h2><ul><li>核心訊息：追求「健康前提下的美麗」。</li><li>破除迷思：效果不需依靠高溫強鹼或犧牲髮質。</li><li>善用證據：以 SGS 報告、專利證書增加說服力。</li></ul></div> </div>
+        <div class="slide" data-timestamp="346"> <div class="slide-content"><h2>溝通策略 2：競品比較與優勢</h2><ul><li>優勢一 (簡化流程)：一劑通用，無需複雜判斷，提升效率。</li><li>優勢二 (同步修護)：邊燙邊護，非燙完才護。</li><li>生動比喻：傳統是「拆房重建」，4S是「加固裝潢」。</li></ul></div> </div>
+        <div class="slide" data-timestamp="451"> <div class="slide-content"><h2>解惑：為何使用雙氧水二劑？</h2><ul><li>健康環保：取代不易分解、可能殘留的溴酸鈉。</li><li>無殘留：反應後分解為水和氧氣，對人體與環境友善。</li><li>縮短等待：可縮短燙後等待洗髮的時間，提升顧客滿意度。</li></ul></div> </div>
+        <div class="slide" data-timestamp="526"> <div class="slide-content"><h2>總結：4S 核心優勢</h2><ul><li>三大支柱：純半胱胺(溫和)、天然植萃(滋養)、麥克爾反應(強化)。</li><li>安全友善：無 TG、溴酸鈉、HCL 等爭議成分。</li><li>最終目標：打造光澤、柔順、有彈性且持久的理想造型。</li></ul></div> </div>
+        <div class="slide" data-timestamp="586"> <div class="slide-content"><h2>給專業設計師的思考</h2><ul><li>如何應用新知，改變與顧客的對話？</li><li>如何展現專業價值，而不只是價格競爭？</li><li>如何為您的沙龍創造市場差異化？</li></ul></div> </div>
+    </div>
+
+    <div id="prev-btn" class="nav-arrow">‹</div>
+    <div id="next-btn" class="nav-arrow">›</div>
+    
+    <div id="timer-display">00:00</div>
+
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    // --- DOM Elements ---
+    const presentationContainer = document.getElementById('presentation-container');
+    const playerContainer = document.getElementById('player-container');
+    const coverPage = document.getElementById('cover-page');
+    const startButton = document.getElementById('start-button');
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const timerDisplay = document.getElementById('timer-display');
+    const videoId = 'q29sP2WL3cg';
+
+    // --- State Variables ---
+    let player;
+    let currentSlideIndex = -1;
+    let mainIntervalId;
+    let timerIntervalId;
+    let isAutoPlay = true;
+
+    // --- Initialization ---
+    coverPage.style.backgroundImage = `url(https://img.youtube.com/vi/${videoId}/maxresdefault.jpg)`;
+
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            videoId: videoId,
+            playerVars: { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'iv_load_policy': 3, 'modestbranding': 1, 'rel': 0, 'showinfo': 0, 'enablejsapi': 1 },
+            events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
+        });
+    }
+
+    function onPlayerReady(event) { /* Player is ready */ }
+
+    // --- Event Listeners ---
+    startButton.addEventListener('click', () => {
+        enterFullscreen(presentationContainer);
+        coverPage.classList.add('hidden');
+        playerContainer.classList.add('visible');
+        setTimeout(() => { player.playVideo(); }, 500);
+    });
+
+    prevBtn.addEventListener('click', () => changeSlide(-1));
+    nextBtn.addEventListener('click', () => changeSlide(1));
+
+    // --- Core Logic ---
+    function onPlayerStateChange(event) {
+        if (event.data === YT.PlayerState.PLAYING) {
+            isAutoPlay = true;
+            if (currentSlideIndex === -1) {
+                startPresentation();
+            }
+        }
+        if (event.data === YT.PlayerState.PAUSED) {
+            isAutoPlay = false;
+        }
+        if (event.data === YT.PlayerState.ENDED) {
+            endPresentation();
+        }
+    }
+
+    function startPresentation() {
+        currentSlideIndex = 0;
+        updateSlideAndNav();
+        mainIntervalId = setInterval(checkVideoTime, 500);
+        timerDisplay.classList.add('visible');
+        timerIntervalId = setInterval(updateTimer, 1000);
+    }
+    
+    function endPresentation() {
+        clearInterval(mainIntervalId);
+        exitFullscreen();
+        if (currentSlideIndex !== -1 && slides[currentSlideIndex]) {
+             slides[currentSlideIndex].classList.remove('active');
+        }
+        currentSlideIndex = -1;
+        playerContainer.classList.remove('visible');
+        coverPage.classList.remove('hidden');
+        updateNavVisibility();
+        clearInterval(timerIntervalId);
+        timerDisplay.classList.remove('visible');
+        player.stopVideo();
+    }
+    
+    function changeSlide(direction) {
+        isAutoPlay = false;
+        const newIndex = currentSlideIndex + direction;
+        if (newIndex >= 0 && newIndex < slides.length) {
+            currentSlideIndex = newIndex;
+            const timestamp = parseInt(slides[currentSlideIndex].getAttribute('data-timestamp'));
+            player.seekTo(timestamp, true);
+            player.playVideo();
+            updateSlideAndNav();
+        }
+    }
+
+    function checkVideoTime() {
+        if (!isAutoPlay || !player || typeof player.getCurrentTime !== 'function') return;
+        const currentTime = player.getCurrentTime();
+        let nextSlideIndex = 0;
+        for (let i = 0; i < slides.length; i++) {
+            const slideTimestamp = parseInt(slides[i].getAttribute('data-timestamp'));
+            if (currentTime >= slideTimestamp) {
+                nextSlideIndex = i;
+            } else {
+                break;
+            }
+        }
+        if (nextSlideIndex !== currentSlideIndex) {
+            currentSlideIndex = nextSlideIndex;
+            updateSlideAndNav();
+        }
+    }
+    
+    function updateSlideAndNav() {
+        updateSlide();
+        updateNavVisibility();
+    }
+
+    // --- UI Update Functions ---
+    function updateSlide() {
+        slides.forEach((slide, index) => {
+            slide.classList.toggle('active', index === currentSlideIndex);
+        });
+    }
+
+    function updateNavVisibility() {
+        if (currentSlideIndex > -1) {
+            prevBtn.classList.add('visible');
+            nextBtn.classList.add('visible');
+        } else {
+            prevBtn.classList.remove('visible');
+            nextBtn.classList.remove('visible');
+        }
+    }
+    
+    function updateTimer() {
+        if (!player || typeof player.getCurrentTime !== 'function') return;
+        const currentTime = player.getCurrentTime() || 0;
+        timerDisplay.textContent = formatTime(currentTime);
+    }
+    
+    function formatTime(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // --- Fullscreen Functions ---
+    function enterFullscreen(element) {
+        if (element.requestFullscreen) element.requestFullscreen();
+        else if (element.mozRequestFullScreen) element.mozRequestFullScreen();
+        else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
+        else if (element.msRequestFullscreen) element.msRequestFullscreen();
+    }
+    function exitFullscreen() {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        else if (document.msExitFullscreen) document.msExitFullscreen();
+    }
+</script>
+
+</body>
+</html>
